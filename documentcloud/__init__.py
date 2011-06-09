@@ -199,7 +199,7 @@ class DocumentClient(BaseDocumentCloudClient):
         return Document(data)
     
     @credentials_required
-    def upload(self, path, title=None, source=None, description=None,
+    def upload(self, o_file, title=None, source=None, description=None,
         related_article=None, published_url=None, access='private',
         project=None, data=None, secure=False):
         """
@@ -213,14 +213,16 @@ class DocumentClient(BaseDocumentCloudClient):
         
         Based on code developed by Mitchell Kotler and refined by Christopher Groskopf.
         """
+        if o_file == None or not hasattr(o_file, 'read'):
+            raise ValueError("Gimme a file obj, punk")
         # Required parameters
-        params = {'file': open(path, 'rb')}
+        params = {'file': o_file}
         # Optional parameters
         if title:
             params['title'] = title
-        else:
+        else: 
             # Set it to the file name
-            params['title'] = path.split(os.sep)[-1].split(".")[0]
+            params['title'] = o_file.name
         if source: params['source'] = source
         if description: params['description'] = description
         if related_article: params['related_article'] = related_article

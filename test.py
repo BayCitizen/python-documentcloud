@@ -20,8 +20,9 @@ from documentcloud import DocumentCloud
 from documentcloud import CredentialsMissingError, DuplicateObjectError
 from documentcloud import CredentialsFailedError, DoesNotExistError
 from documentcloud import Annotation, Document, Project, Section, Entity, Mention
-from private_settings import DOCUMENTCLOUD_USERNAME, DOCUMENTCLOUD_PASSWORD
-
+#from private_settings import DOCUMENTCLOUD_USERNAME, DOCUMENTCLOUD_PASSWORD
+DOCUMENTCLOUD_USERNAME = 'shifflett.shane@gmail.com'
+DOCUMENTCLOUD_PASSWORD = 'xkcdH4ck'
 #
 # Odds and ends
 #
@@ -254,8 +255,8 @@ class DocumentSearchTest(BaseTest):
         """
         # Create it
         title = '001 - Test upload (%s)' % get_random_string()
-        obj = self.private_client.documents.upload(
-            os.path.join(os.path.dirname(__file__), "test.pdf"),
+        m_file = open(os.path.join(os.path.dirname(__file__), "test.pdf"), 'rb')
+        obj = self.private_client.documents.upload(m_file,
             title,
             description='Blah blah',
             related_article='http://www.latimes.com',
@@ -281,7 +282,7 @@ class DocumentSearchTest(BaseTest):
         # Create it
         title = '001 - Test upload (%s)' % get_random_string()
         obj = self.private_client.documents.upload(
-            os.path.join(os.path.dirname(__file__), "test.pdf"),
+            open(os.path.join(os.path.dirname(__file__), "test.pdf"), 'rb'),
             title,
             secure=True,
         )

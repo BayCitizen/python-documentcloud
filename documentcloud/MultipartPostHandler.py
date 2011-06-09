@@ -61,7 +61,7 @@ class MultipartPostHandler(urllib2.BaseHandler):
             v_vars = []
             try:
                  for(key, value) in data.items():
-                     if type(value) == file:
+                     if hasattr(value, 'read'):
                          v_files.append((key, value))
                      else:
                          v_vars.append((key, value))
@@ -92,7 +92,7 @@ class MultipartPostHandler(urllib2.BaseHandler):
             buffer += 'Content-Disposition: form-data; name="%s"' % key
             buffer += '\r\n\r\n' + value + '\r\n'
         for(key, fd) in files:
-            file_size = os.fstat(fd.fileno())[stat.ST_SIZE]
+            file_size = getsize(fd)
             filename = fd.name.split('/')[-1]
             contenttype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
             buffer += '--%s\r\n' % boundary
@@ -107,9 +107,20 @@ class MultipartPostHandler(urllib2.BaseHandler):
 
     https_request = http_request
 
+def getsize(o_file):
+    """
+    get the size, either by seeeking to the end.
+    """
+    from os import SEEK_END
+    startpos=o_file.tell()
+    o_file.seek(0)
+    o_file.seek(0,SEEK_END)
+    size=o_file.tell()
+    o_file.seek(startpos)
+    return size
+
 def main():
     import tempfile, sys
-
     validatorURL = "http://validator.w3.org/check"
     opener = urllib2.build_opener(MultipartPostHandler)
 
@@ -119,7 +130,6 @@ def main():
         params = { "ss" : "0",            # show source
                    "doctype" : "Inline",
                    "uploaded_file" : open(temp[1], "rb") }
-        print opener.open(validatorURL, params).read()
         os.remove(temp[1])
 
     if len(sys.argv[1:]) > 0:
