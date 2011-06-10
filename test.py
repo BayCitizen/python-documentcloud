@@ -20,9 +20,7 @@ from documentcloud import DocumentCloud
 from documentcloud import CredentialsMissingError, DuplicateObjectError
 from documentcloud import CredentialsFailedError, DoesNotExistError
 from documentcloud import Annotation, Document, Project, Section, Entity, Mention
-#from private_settings import DOCUMENTCLOUD_USERNAME, DOCUMENTCLOUD_PASSWORD
-DOCUMENTCLOUD_USERNAME = 'shifflett.shane@gmail.com'
-DOCUMENTCLOUD_PASSWORD = 'xkcdH4ck'
+from private_settings import DOCUMENTCLOUD_USERNAME, DOCUMENTCLOUD_PASSWORD
 #
 # Odds and ends
 #
