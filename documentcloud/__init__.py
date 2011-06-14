@@ -32,7 +32,7 @@ class BaseDocumentCloudClient(object):
     """
     Patterns common to all of the different API methods.
     """
-    BASE_URI = u'https://www.documentcloud.org/api/'
+    BASE_URI = 'https://www.documentcloud.org/api/'
     
     def __init__(self, username, password):
         self.username = username
@@ -67,6 +67,7 @@ class BaseDocumentCloudClient(object):
             elif e.code == 401:
                 raise CredentialsFailedError("The resource you've requested requires proper credentials.")
             else:
+                print e
                 raise e
         # Read the response and return it
         return response.read()
@@ -155,7 +156,7 @@ class DocumentClient(BaseDocumentCloudClient):
             'per_page': per_page,
             'mentions': 3,
         }
-        data = self.fetch(u'search.json', params)
+        data = self.fetch('search.json', params)
         return data.get("documents")
     
     def search(self, query):
@@ -191,7 +192,7 @@ class DocumentClient(BaseDocumentCloudClient):
         
         Example usage:
         
-            >> documentcloud.documents.get(u'71072-oir-final-report')
+            >> documentcloud.documents.get('71072-oir-final-report')
         
         """
         data = self.fetch('documents/%s.json' % id).get("document")
@@ -199,30 +200,41 @@ class DocumentClient(BaseDocumentCloudClient):
         return Document(data)
     
     @credentials_required
-    def upload(self, o_file, title=None, source=None, description=None,
+    def upload(self, pdf, title=None, source=None, description=None,
         related_article=None, published_url=None, access='private',
         project=None, data=None, secure=False):
         """
         Upload a PDF or other image file to DocumentCloud.
         
+        You can submit either a pdf opened as a file object or a path to a pdf file.
+        
         Example usage:
         
-            >> documentcloud.documents.upload("/home/ben/sample.pdf", "sample")
+            # From a file path
+            >> documentcloud.documents.upload("/home/ben/sample.pdf", "sample title")
         
-        Returns the documentcloud id of the document that's created.
+            # From a file object
+            >> pdf = open(path, 'rb')
+            >> documentcloud.documents.upload(pdf, "sample title")
+
+        Returns the document that's created as a Document object.
         
         Based on code developed by Mitchell Kotler and refined by Christopher Groskopf.
         """
-        if o_file == None or not hasattr(o_file, 'read'):
-            raise ValueError("Gimme a file obj, punk")
         # Required parameters
-        params = {'file': o_file}
+        if hasattr(pdf, 'read'):
+            params = {'file': pdf}
+        else:
+            params = {'file': open(pdf, 'rb')}
         # Optional parameters
         if title:
             params['title'] = title
-        else: 
+        else:
             # Set it to the file name
-            params['title'] = o_file.name
+            if hasattr(pdf, 'read'):
+                params['title'] = pdf.name.split(os.sep)[-1].split(".")[0]
+            else:
+                params['title'] = pdf.split(os.sep)[-1].split(".")[0]
         if source: params['source'] = source
         if description: params['description'] = description
         if related_article: params['related_article'] = related_article
@@ -315,7 +327,7 @@ class ProjectClient(BaseDocumentCloudClient):
         
         Example usage:
         
-            >> documentcloud.projects.get(u'arizona-shootings')
+            >> documentcloud.projects.get('arizona-shootings')
         
         """
         # Make sure the kwargs are kosher
@@ -513,16 +525,40 @@ class Document(BaseAPIObject):
     # Lazy loaded attributes
     #
     
+    def _lazy_load(self):
+        """
+        Fetch metadata if it was overlooked during the object's creation.
+        
+        This can happen when you retrieve documents via search, because
+        the JSON response does not include complete meta data for all 
+        results. 
+        """
+        obj = self._connection.documents.get(id=self.id)
+        self.__dict__['contributor'] = obj.contributor
+        self.__dict__['contributor_organization'] = obj.contributor_organization
+        self.__dict__['data'] = obj.data
+        self.__dict__['annotations'] = obj.__dict__['annotations']
+        self.__dict__['sections'] = obj.__dict__['sections']
+        entities = self._connection.fetch(
+                "documents/%s/entities.json" % self.id
+            ).get("entities")
+        obj_list = []
+        for type, entity_list in entities.items():
+            for entity in entity_list:
+                entity['type'] = type
+                obj = Entity(entity)
+                obj_list.append(obj)
+        self.__dict__['entities'] = obj_list
+    
     def get_contributor(self):
         """
         Fetch the contributor field if it does not exist.
         """
         try:
-            return self.__dict__[u'contributor']
+            return self.__dict__['contributor']
         except KeyError:
-            obj = self._connection.documents.get(id=self.id)
-            self.__dict__[u'contributor'] = obj.contributor
-            return obj.contributor
+            self._lazy_load()
+            return self.__dict__['contributor']
     contributor = property(get_contributor)
     
     def get_contributor_organization(self):
@@ -530,11 +566,10 @@ class Document(BaseAPIObject):
         Fetch the contributor_organization field if it does not exist.
         """
         try:
-            return self.__dict__[u'contributor_organization']
+            return self.__dict__['contributor_organization']
         except KeyError:
-            obj = self._connection.documents.get(id=self.id)
-            self.__dict__[u'contributor_organization'] = obj.contributor_organization
-            return obj.contributor_organization
+            self._lazy_load()
+            return self.__dict__['contributor_organization']
     contributor_organization = property(get_contributor_organization)
     
     def set_data(self, data):
@@ -543,18 +578,17 @@ class Document(BaseAPIObject):
         """
         if type(data) != type({}):
             raise TypeError("This attribute must be a dictionary.")
-        self.__dict__[u'data'] = data
+        self.__dict__['data'] = data
     
     def get_data(self):
         """
         Fetch the data field if it does not exist.
         """
         try:
-            return self.__dict__[u'data']
+            return self.__dict__['data']
         except KeyError:
-            obj = self._connection.documents.get(id=self.id)
-            self.__dict__[u'data'] = obj.data
-            return obj.data
+            self._lazy_load()
+            return self.__dict__['data']
     data = property(get_data, set_data)
     
     def get_annotations(self):
@@ -562,13 +596,12 @@ class Document(BaseAPIObject):
         Fetch the annotations field if it does not exist.
         """
         try:
-            obj_list = self.__dict__[u'annotations']
+            obj_list = self.__dict__['annotations']
             return [Annotation(i) for i in obj_list]
         except KeyError:
-            obj = self._connection.documents.get(id=self.id)
-            obj_list = [Annotation(i) for i in obj.__dict__['annotations']]
-            self.__dict__[u'annotations'] =obj.__dict__['annotations']
-            return obj_list
+            self._lazy_load()
+            obj_list = self.__dict__['annotations']
+            return [Annotation(i) for i in obj_list]
     annotations = property(get_annotations)
     
     def get_sections(self):
@@ -576,13 +609,12 @@ class Document(BaseAPIObject):
         Fetch the sections field if it does not exist.
         """
         try:
-            obj_list = self.__dict__[u'sections']
+            obj_list = self.__dict__['sections']
             return [Section(i) for i in obj_list]
         except KeyError:
-            obj = self._connection.documents.get(id=self.id)
-            obj_list = [Section(i) for i in obj.__dict__['sections']]
-            self.__dict__[u'sections'] = obj.__dict__['sections']
-            return obj_list
+            self._lazy_load()
+            obj_list = self.__dict__['sections']
+            return [Section(i) for i in obj_list]
     sections = property(get_sections)
     
     def get_entities(self):
@@ -590,17 +622,10 @@ class Document(BaseAPIObject):
         Fetch the entities extracted from this document by OpenCalais.
         """
         try:
-            return self.__dict__[u'entities']
+            return self.__dict__['entities']
         except KeyError:
-            data = self._connection.fetch("documents/%s/entities.json" % self.id).get("entities")
-            obj_list = []
-            for type, entity_list in data.items():
-                for entity in entity_list:
-                    entity['type'] = type
-                    obj = Entity(entity)
-                    obj_list.append(obj)
-            self.__dict__[u'entities'] = obj_list
-            return obj_list
+            self._lazy_load()
+            return self.__dict__['entities']
     entities = property(get_entities)
     
     #
@@ -879,9 +904,9 @@ class Project(BaseAPIObject):
         # Allow document_list to be zeroed out with [] or None
         if attr == 'document_list':
             if value == None:
-                self.__dict__[u'document_list'] = DocumentSet([])
+                self.__dict__['document_list'] = DocumentSet([])
             elif isinstance(value, list):
-                self.__dict__[u'document_list'] = DocumentSet(value)
+                self.__dict__['document_list'] = DocumentSet(value)
             else:
                 raise TypeError
         else:
@@ -932,10 +957,10 @@ class Project(BaseAPIObject):
         Retrieves all documents included in this project.
         """
         try:
-            return self.__dict__[u'document_list']
+            return self.__dict__['document_list']
         except KeyError:
             obj_list = DocumentSet([self._connection.documents.get(i) for i in self.document_ids])
-            self.__dict__[u'document_list'] = obj_list
+            self.__dict__['document_list'] = obj_list
             return obj_list
     document_list = property(get_document_list)
     
@@ -979,5 +1004,3 @@ class Section(BaseAPIObject):
     A section earmarked inside of a Document
     """
     pass
-
-
