@@ -15,6 +15,7 @@ import random
 import string
 import textwrap
 import unittest
+import StringIO
 from copy import copy
 from documentcloud import DocumentCloud
 from documentcloud import CredentialsMissingError, DuplicateObjectError
@@ -284,6 +285,37 @@ class DocumentSearchTest(BaseTest):
             title,
             secure=True,
         )
+        self.assertEqual(type(obj), Document)
+        # Delete it
+        obj.delete()
+        self.assertRaises(DoesNotExistError, self.private_client.documents.get, obj.id)
+
+    def test_unicode_upload_and_delete(self):
+        """
+        Ensure that documents with non-english characters can be uploaded
+        """
+        title = 'Espanola!'
+        obj = self.private_client.documents.upload(
+            open(os.path.join(os.path.dirname(__file__), "espanol.pdf"), 'rb'),
+            title,
+            secure=True,
+        )
+        self.assertEqual(type(obj), Document)
+        # Delete it
+        obj.delete()
+        self.assertRaises(DoesNotExistError, self.private_client.documents.get, obj.id)
+
+    def test_virtual_file_upload_and_delete(self):
+        """
+        Proxy test case for files stored in memory, for instance, django-storages
+        these tests are difficult to create as the class used to represent a file
+        object is determined at runtime by the DEFAULT_FILE_STORAGE var (django)
+        anyway, the main point is to show the MultipartPostHandler can handle unicode
+        """
+        real_file = open(os.path.join(os.path.dirname(__file__), "espanol.pdf"), 'rb')
+        virtual_file = StringIO.StringIO(file.read())
+        obj = self.private_client.documents.upload(pdf=file, title='Espanola!',\
+         secure=True)
         self.assertEqual(type(obj), Document)
         # Delete it
         obj.delete()
