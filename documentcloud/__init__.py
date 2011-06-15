@@ -67,7 +67,6 @@ class BaseDocumentCloudClient(object):
             elif e.code == 401:
                 raise CredentialsFailedError("The resource you've requested requires proper credentials.")
             else:
-                print e
                 raise e
         # Read the response and return it
         return response.read()
